@@ -15,5 +15,9 @@ void exitS();
 void help();
 void init();
 char* getInput();
+void copyFile(const char *source, const char *destination);
+void moveFile(const char *source, const char *destination);
+void catFile(const char *file);
+
 
 #endif

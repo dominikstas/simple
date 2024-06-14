@@ -1,4 +1,31 @@
-#include "simple.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+void execute(char *command);
+void echo(char *text);
+void exitS();
+void help();
+void init();
+char* getInput();
+void copyFile(const char *source, const char *destination);
+void moveFile(const char *source, const char *destination);
+void catFile(const char *file);
+
+int main() {
+    init();
+    while (1) {
+        printf("> ");
+        char *command = getInput();
+        execute(command);
+        free(command);
+    }
+    return 0;
+}
 
 void execute(char *command) {
     if (strncmp(command, "echo ", 5) == 0) {
@@ -52,6 +79,31 @@ void execute(char *command) {
         } else {
             fclose(fp);
         }
+    } else if (strncmp(command, "cp ", 3) == 0) {
+        char *args = command + 3;
+        char *source = strtok(args, " ");
+        char *destination = strtok(NULL, " ");
+        if (source && destination) {
+            copyFile(source, destination);
+        } else {
+            printf("Usage: cp [source] [destination]\n");
+        }
+    } else if (strncmp(command, "mv ", 3) == 0) {
+        char *args = command + 3;
+        char *source = strtok(args, " ");
+        char *destination = strtok(NULL, " ");
+        if (source && destination) {
+            moveFile(source, destination);
+        } else {
+            printf("Usage: mv [source] [destination]\n");
+        }
+    } else if (strncmp(command, "cat ", 4) == 0) {
+        char *file = command + 4;
+        if (strlen(file) > 0) {
+            catFile(file);
+        } else {
+            printf("Usage: cat [file]\n");
+        }
     } else {
         printf("Unknown command: %s\n", command);
     }
@@ -77,16 +129,19 @@ void help() {
     printf("pwd - print working directory\n");
     printf("rm [file] - remove a file\n");
     printf("touch [file] - create an empty file\n");
+    printf("cp [source] [destination] - copy a file\n");
+    printf("mv [source] [destination] - move/rename a file\n");
+    printf("cat [file] - display file contents\n");
     printf("exit - exit the terminal\n");
     printf("--------------------------------------\n");
 }
 
-void init(){
+void init() {
     system("clear");
     printf("Welcome!\n");
 }
 
-char* getInput(){
+char* getInput() {
     char *input = NULL;
     size_t bufferSize = 0;
 
@@ -94,4 +149,60 @@ char* getInput(){
     input[strcspn(input, "\n")] = '\0';
 
     return input;
+}
+
+void copyFile(const char *source, const char *destination) {
+    int src_fd = open(source, O_RDONLY);
+    if (src_fd < 0) {
+        perror("cp");
+        return;
+    }
+
+    int dest_fd = open(destination, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (dest_fd < 0) {
+        perror("cp");
+        close(src_fd);
+        return;
+    }
+
+    char buffer[4096];
+    ssize_t bytesRead, bytesWritten;
+
+    while ((bytesRead = read(src_fd, buffer, sizeof(buffer))) > 0) {
+        bytesWritten = write(dest_fd, buffer, bytesRead);
+        if (bytesWritten != bytesRead) {
+            perror("cp");
+            close(src_fd);
+            close(dest_fd);
+            return;
+        }
+    }
+
+    if (bytesRead < 0) {
+        perror("cp");
+    }
+
+    close(src_fd);
+    close(dest_fd);
+}
+
+void moveFile(const char *source, const char *destination) {
+    if (rename(source, destination) != 0) {
+        perror("mv");
+    }
+}
+
+void catFile(const char *file) {
+    FILE *fp = fopen(file, "r");
+    if (fp == NULL) {
+        perror("cat");
+        return;
+    }
+
+    char buffer[4096];
+    while (fgets(buffer, sizeof(buffer), fp) != NULL) {
+        printf("%s", buffer);
+    }
+
+    fclose(fp);
 }
